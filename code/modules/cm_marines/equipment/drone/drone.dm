@@ -14,7 +14,11 @@
 	projectile_coverage = PROJECTILE_COVERAGE_NONE
 	health = 60
 	var/maxhealth = 60
-	var/obj/structure/machinery/computer/cameras/drone/internal_camera
+
+/obj/structure/drone/Initialize(mapload, health = src.health, maxhealth = src.maxhealth)
+	. = ..()
+	src.health = health
+	src.maxhealth = maxhealth
 
 /obj/structure/drone/attack_alien(mob/living/carbon/xenomorph/xeno)
 	xeno.animation_attack_on(src)
@@ -59,16 +63,13 @@
 			playsound(src.loc, 'sound/items/Welder2.ogg', 25, TRUE)
 			to_chat(user, SPAN_NOTICE("You repair some damage to \the [src]"))
 			welder.remove_fuel(0, user)
-			return
+			return (ATTACKBY_HINT_NO_AFTERATTACK|ATTACKBY_HINT_UPDATE_NEXT_MOVE)
 		return
 	if(object.force > 0 || user.a_intent == INTENT_HARM)
-		user.visible_message(SPAN_DANGER("[user] hits \the [src] with \the [object]!"))
-		user.animation_attack_on(src)
-		user.flick_attack_overlay(src, "punch")
 		if(object.force >= MELEE_FORCE_TIER_1)
 			playsound(src.loc, 'sound/effects/metalhit.ogg', 25)
 		update_health(object.force)
-		return
+	. = ..()
 
 /obj/structure/drone/bullet_act(obj/projectile/proj)
 	bullet_ping(proj)
@@ -97,7 +98,7 @@
 		grab_drone(user)
 
 /obj/structure/drone/ex_act(severity, direction)
-	new /obj/effect/spawner/gibspawner/robot(src.loc)
+	update_health(severity)
 	. = ..()
 
 /obj/structure/drone/proc/grab_drone(mob/living/user)
@@ -107,14 +108,19 @@
 		to_chat(user, SPAN_WARNING("You try picking up \the [src] but it scuttles away from your grasp."))
 		//src.Move(newloc) - move away from user
 		return
-	var/obj/item/drone/grabbed_drone = new /obj/item/drone(src.loc)
-	grabbed_drone.do_pickup_animation(usr.loc)
-	usr.put_in_hands(grabbed_drone)
-	qdel(src)
+	to_chat(user, SPAN_NOTICE("You being picking up \the [src]."))
+	if(do_after(user, 2 SECONDS, INTERRUPT_ALL, BUSY_ICON_FRIENDLY, src))
+		to_chat(user, SPAN_NOTICE("You pickup \the [src]!"))
+		playsound(src.loc, 'sound/machines/pda_button1.ogg')
+		var/obj/item/drone/grabbed_drone = new /obj/item/drone(src.loc, src.health, src.maxhealth)
+		grabbed_drone.do_pickup_animation(usr.loc)
+		usr.put_in_hands(grabbed_drone)
+
+		qdel(src)
 
 /obj/structure/drone/MouseDrop(over_object, src_location, over_location)
 	..()
-	if(over_object == usr && Adjacent(usr))
+	if(over_object == usr && Adjacent(usr)) // This may be redundant
 		grab_drone(over_object)
 
 /obj/item/drone
@@ -128,6 +134,13 @@
 		WEAR_L_HAND = 'icons/mob/humans/onmob/inhands/items_by_map/jungle_lefthand.dmi',
 		WEAR_R_HAND = 'icons/mob/humans/onmob/inhands/items_by_map/jungle_righthand.dmi'
 	)
+	health = 60
+	var/maxhealth = 60
+
+/obj/item/drone/Initialize(mapload, health = src.health, maxhealth = src.maxhealth)
+	. = ..()
+	src.health = health
+	src.maxhealth = maxhealth
 
 // Copied from mortar
 /obj/item/drone/attack_self(mob/user)
@@ -138,8 +151,12 @@
 	if(!skillcheck(user, SKILL_ENGINEER, SKILL_ENGINEER_NOVICE))
 		to_chat(user, SPAN_WARNING("You don't have the training to deploy \the [src]."))
 		return
-	var/area/area = get_area(deploy_turf)
-	var/obj/structure/drone/drone = new /obj/structure/drone(deploy_turf)
-	user.visible_message(SPAN_NOTICE("[user] deploys \the [src]."), SPAN_NOTICE("You deploy \the [src]."))
-	drone.name = src.name
-	qdel(src)
+	to_chat(user, SPAN_NOTICE("You start deploying \the [src]."))
+	if(do_after(user, 1 SECONDS, INTERRUPT_ALL, BUSY_ICON_FRIENDLY, src))
+		playsound(src.loc, 'sound/machines/pda_button1.ogg')
+		var/area/area = get_area(deploy_turf)
+		var/obj/structure/drone/drone = new /obj/structure/drone(deploy_turf, src.health, src.maxhealth)
+		user.visible_message(SPAN_NOTICE("[user] deploys \the [src]."), SPAN_NOTICE("You deploy \the [src]."))
+		drone.name = src.name
+		qdel(src)
+
