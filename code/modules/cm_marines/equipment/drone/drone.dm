@@ -14,11 +14,25 @@
 	projectile_coverage = PROJECTILE_COVERAGE_NONE
 	health = 60
 	var/maxhealth = 60
+	var/serial_number // Used to tell which controller is connected to which unique drone
+	var/obj/item/drone_controller/linked_controller // Controller object linked to the drone. Null if not connected.
 
-/obj/structure/drone/Initialize(mapload, health = src.health, maxhealth = src.maxhealth)
+/proc/generate_id()
+	return "[pick(GLOB.alphabet_uppercase)][pick(GLOB.alphabet_uppercase)][pick(GLOB.alphabet_uppercase)]-[rand(1, 9)][pick(GLOB.alphabet_uppercase)]"
+
+/obj/structure/drone/Initialize(mapload, health = src.health, maxhealth = src.maxhealth, linked_controller = src.linked_controller, serial_number = src.serial_number)
 	. = ..()
 	src.health = health
 	src.maxhealth = maxhealth
+	src.linked_controller = linked_controller
+	if(!isnull(linked_controller))
+		var/obj/item/drone_controller/controller = src.linked_controller
+		controller.linked_drone = src
+	if(isnull(serial_number))
+		src.serial_number = generate_id()
+	else
+		src.serial_number = serial_number
+
 
 /obj/structure/drone/attack_alien(mob/living/carbon/xenomorph/xeno)
 	xeno.animation_attack_on(src)
@@ -48,6 +62,14 @@
 			new /obj/effect/particle_effect/sparks(src.loc)
 
 /obj/structure/drone/attackby(obj/item/object as obj, mob/living/user as mob)
+	if(istype(object, /obj/item/drone_controller))
+		var/obj/item/drone_controller/controller = object
+		if(!isnull(src.linked_controller))
+			src.linked_controller.unlink_drone()
+		src.linked_controller = controller
+		controller.linked_drone = src
+		user.balloon_alert(user, "linked!")
+		return
 	if(HAS_TRAIT(object, TRAIT_TOOL_BLOWTORCH))
 		var/obj/item/tool/weldingtool/welder = object
 		if(!welder.isOn())
@@ -112,7 +134,7 @@
 	if(do_after(user, 2 SECONDS, INTERRUPT_ALL, BUSY_ICON_FRIENDLY, src))
 		to_chat(user, SPAN_NOTICE("You pickup \the [src]!"))
 		playsound(src.loc, 'sound/machines/pda_button1.ogg')
-		var/obj/item/drone/grabbed_drone = new /obj/item/drone(src.loc, src.health, src.maxhealth)
+		var/obj/item/drone/grabbed_drone = new /obj/item/drone(src.loc, src.health, src.maxhealth, src.linked_controller, src.serial_number)
 		grabbed_drone.do_pickup_animation(usr.loc)
 		usr.put_in_hands(grabbed_drone)
 
@@ -129,18 +151,57 @@
 	icon = 'icons/mob/robots.dmi'
 	icon_state = "spiderbot-chassis"
 	w_class = SIZE_MEDIUM
-	flags_atom = FPRINT|CONDUCT
+	flags_atom = CONDUCT|NOBLUDGEON
 	item_icons = list(
 		WEAR_L_HAND = 'icons/mob/humans/onmob/inhands/items_by_map/jungle_lefthand.dmi',
 		WEAR_R_HAND = 'icons/mob/humans/onmob/inhands/items_by_map/jungle_righthand.dmi'
 	)
 	health = 60
 	var/maxhealth = 60
+	var/obj/item/drone_controller/linked_controller
+	var/serial_number
 
-/obj/item/drone/Initialize(mapload, health = src.health, maxhealth = src.maxhealth)
+/obj/item/drone/Initialize(mapload, health = src.health, maxhealth = src.maxhealth, linked_controller = src.linked_controller, serial_number = src.serial_number)
 	. = ..()
 	src.health = health
 	src.maxhealth = maxhealth
+	src.linked_controller = linked_controller
+	if(!isnull(linked_controller))
+		var/obj/item/drone_controller/controller = src.linked_controller
+		controller.linked_drone = src
+	if(isnull(serial_number))
+		src.serial_number = generate_id()
+	else
+		src.serial_number = serial_number
+
+
+/obj/item/drone/attackby(obj/item/object as obj, mob/living/user as mob)
+	if(istype(object, /obj/item/drone_controller))
+		var/obj/item/drone_controller/controller = object
+		if(!isnull(src.linked_controller))
+			src.linked_controller.unlink_drone()
+		src.linked_controller = controller
+		controller.linked_drone = src
+		user.balloon_alert(user, "linked!")
+		return
+	if(HAS_TRAIT(object, TRAIT_TOOL_BLOWTORCH))
+		var/obj/item/tool/weldingtool/welder = object
+		if(!welder.isOn())
+			to_chat(user, SPAN_WARNING("\The [welder] needs to be on!"))
+			return
+		if(health >= maxhealth)
+			to_chat(user, SPAN_NOTICE("\The [src] does need any more repairs."))
+			return
+		to_chat(user, SPAN_NOTICE("You begin repairing the damage to \the [src]."))
+		playsound(src.loc, 'sound/items/Welder2.ogg', 25, TRUE)
+		if(do_after(user, 6 SECONDS * user.get_skill_duration_multiplier(SKILL_ENGINEER), INTERRUPT_ALL, BUSY_ICON_FRIENDLY, src))
+			update_health(-20)
+			playsound(src.loc, 'sound/items/Welder2.ogg', 25, TRUE)
+			to_chat(user, SPAN_NOTICE("You repair some damage to \the [src]"))
+			welder.remove_fuel(0, user)
+			return (ATTACKBY_HINT_NO_AFTERATTACK|ATTACKBY_HINT_UPDATE_NEXT_MOVE)
+		return
+	. = ..()
 
 // Copied from mortar
 /obj/item/drone/attack_self(mob/user)
@@ -155,8 +216,19 @@
 	if(do_after(user, 1 SECONDS, INTERRUPT_ALL, BUSY_ICON_FRIENDLY, src))
 		playsound(src.loc, 'sound/machines/pda_button1.ogg')
 		var/area/area = get_area(deploy_turf)
-		var/obj/structure/drone/drone = new /obj/structure/drone(deploy_turf, src.health, src.maxhealth)
+		var/obj/structure/drone/drone = new /obj/structure/drone(deploy_turf, src.health, src.maxhealth, src.linked_controller, src.serial_number)
 		user.visible_message(SPAN_NOTICE("[user] deploys \the [src]."), SPAN_NOTICE("You deploy \the [src]."))
 		drone.name = src.name
 		qdel(src)
 
+/obj/item/drone_controller
+	name = "\improper M-2137 Beetle Drone Controller"
+	desc = "A handheld controller for controlling the M-2137 Beetle Drone."
+	icon = 'icons/obj/items/devices.dmi'
+	icon_state = "Cotablet"
+	w_class = SIZE_SMALL
+	flags_atom = CONDUCT|NOBLUDGEON
+	var/linked_drone // Drone object linked to the controller. Null if not connected.
+
+/obj/item/drone_controller/proc/unlink_drone()
+	src.linked_drone = null
