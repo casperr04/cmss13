@@ -307,6 +307,15 @@ GLOBAL_LIST_EMPTY_TYPED(all_cameras, /obj/structure/machinery/camera)
 	colony_camera_mapload = FALSE
 	var/obj/item/device/broadcasting/linked_broadcasting
 
+/obj/structure/machinery/camera/drone
+	network = list(CAMERA_NET_ALMAYER)
+	invisibility = INVISIBILITY_ABSTRACT
+	invuln = TRUE
+	unslashable = TRUE
+	unacidable = TRUE
+	colony_camera_mapload = FALSE
+	var/obj/structure/drone/linked_drone
+
 /obj/structure/machinery/camera/correspondent/Initialize(mapload, obj/item/device/broadcasting/camera_item)
 	. = ..()
 	if(!camera_item)

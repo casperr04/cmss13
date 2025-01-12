@@ -15,10 +15,22 @@
 	health = 60
 	var/maxhealth = 60
 	var/serial_number // Used to tell which controller is connected to which unique drone
-	var/obj/item/drone_controller/linked_controller // Controller object linked to the drone. Null if not connected.
+	var/obj/item/device/drone_controller/linked_controller // Controller object linked to the drone. Null if not connected.
+	var/obj/structure/machinery/camera/drone/linked_cam
 
 /proc/generate_id()
 	return "[pick(GLOB.alphabet_uppercase)][pick(GLOB.alphabet_uppercase)][pick(GLOB.alphabet_uppercase)]-[rand(1, 9)][pick(GLOB.alphabet_uppercase)]"
+
+/proc/get_examine_damage(health, maxhealth)
+	var/health_percent = health / maxhealth * 100
+	if(health_percent > 70)
+		. += SPAN_INFO("It looks to be in good shape.")
+	else if(health_percent > 50)
+		. += SPAN_INFO("It looks slightly damaged.")
+	else if(health_percent > 30)
+		. += SPAN_DANGER("It looks pretty damaged.")
+	else if(health_percent >= 0)
+		. += SPAN_DANGER("It looks like it's barely functioning, and in need of urgent repairs.")
 
 /obj/structure/drone/Initialize(mapload, health = src.health, maxhealth = src.maxhealth, linked_controller = src.linked_controller, serial_number = src.serial_number)
 	. = ..()
@@ -26,13 +38,26 @@
 	src.maxhealth = maxhealth
 	src.linked_controller = linked_controller
 	if(!isnull(linked_controller))
-		var/obj/item/drone_controller/controller = src.linked_controller
+		var/obj/item/device/drone_controller/controller = src.linked_controller
 		controller.linked_drone = src
 	if(isnull(serial_number))
 		src.serial_number = generate_id()
 	else
 		src.serial_number = serial_number
+	linked_cam = new(loc, src)
+	linked_cam.status = TRUE
+	linked_cam.c_tag = serial_number
+	RegisterSignal(src, COMSIG_MOVABLE_MOVED, PROC_REF(handle_move))
 
+/obj/structure/drone/Destroy()
+	qdel(src.linked_cam)
+	. = ..()
+
+
+/obj/structure/drone/get_examine_text(mob/user)
+	. = ..()
+	. += SPAN_INFO(get_examine_damage(health, maxhealth))
+	. += SPAN_INFO("It's serial number is [serial_number].")
 
 /obj/structure/drone/attack_alien(mob/living/carbon/xenomorph/xeno)
 	xeno.animation_attack_on(src)
@@ -62,8 +87,8 @@
 			new /obj/effect/particle_effect/sparks(src.loc)
 
 /obj/structure/drone/attackby(obj/item/object as obj, mob/living/user as mob)
-	if(istype(object, /obj/item/drone_controller))
-		var/obj/item/drone_controller/controller = object
+	if(istype(object, /obj/item/device/drone_controller))
+		var/obj/item/device/drone_controller/controller = object
 		if(!isnull(src.linked_controller))
 			src.linked_controller.unlink_drone()
 		src.linked_controller = controller
@@ -123,6 +148,13 @@
 	update_health(severity)
 	. = ..()
 
+/obj/structure/drone/proc/handle_move()
+	if(!linked_cam || QDELETED(linked_cam))
+		linked_cam = new(loc, src)
+	else
+		linked_cam.status = TRUE
+		linked_cam.forceMove(loc)
+
 /obj/structure/drone/proc/grab_drone(mob/living/user)
 	if(!ishuman(user))
 		return
@@ -137,7 +169,6 @@
 		var/obj/item/drone/grabbed_drone = new /obj/item/drone(src.loc, src.health, src.maxhealth, src.linked_controller, src.serial_number)
 		grabbed_drone.do_pickup_animation(usr.loc)
 		usr.put_in_hands(grabbed_drone)
-
 		qdel(src)
 
 /obj/structure/drone/MouseDrop(over_object, src_location, over_location)
@@ -158,7 +189,7 @@
 	)
 	health = 60
 	var/maxhealth = 60
-	var/obj/item/drone_controller/linked_controller
+	var/obj/item/device/drone_controller/linked_controller
 	var/serial_number
 
 /obj/item/drone/Initialize(mapload, health = src.health, maxhealth = src.maxhealth, linked_controller = src.linked_controller, serial_number = src.serial_number)
@@ -167,17 +198,21 @@
 	src.maxhealth = maxhealth
 	src.linked_controller = linked_controller
 	if(!isnull(linked_controller))
-		var/obj/item/drone_controller/controller = src.linked_controller
+		var/obj/item/device/drone_controller/controller = src.linked_controller
 		controller.linked_drone = src
 	if(isnull(serial_number))
 		src.serial_number = generate_id()
 	else
 		src.serial_number = serial_number
 
+/obj/item/drone/get_examine_text(mob/user)
+	. = ..()
+	. += SPAN_INFO(get_examine_damage(health, maxhealth))
+	. += SPAN_INFO("It's serial number is [serial_number].")
 
 /obj/item/drone/attackby(obj/item/object as obj, mob/living/user as mob)
-	if(istype(object, /obj/item/drone_controller))
-		var/obj/item/drone_controller/controller = object
+	if(istype(object, /obj/item/device/drone_controller))
+		var/obj/item/device/drone_controller/controller = object
 		if(!isnull(src.linked_controller))
 			src.linked_controller.unlink_drone()
 		src.linked_controller = controller
@@ -221,7 +256,7 @@
 		drone.name = src.name
 		qdel(src)
 
-/obj/item/drone_controller
+/obj/item/device/drone_controller
 	name = "\improper M-2137 Beetle Drone Controller"
 	desc = "A handheld controller for controlling the M-2137 Beetle Drone."
 	icon = 'icons/obj/items/devices.dmi'
@@ -229,6 +264,51 @@
 	w_class = SIZE_SMALL
 	flags_atom = CONDUCT|NOBLUDGEON
 	var/linked_drone // Drone object linked to the controller. Null if not connected.
+	var/list/network = list(CAMERA_NET_DRONE)
 
-/obj/item/drone_controller/proc/unlink_drone()
+/obj/item/device/drone_controller/proc/unlink_drone()
 	src.linked_drone = null
+
+/obj/item/device/drone_controller/attack_self(mob/user)
+	..()
+	if(isnull(linked_drone))
+		balloon_alert(user, "no linked drone!")
+		return
+	tgui_interact(user)
+
+
+/obj/item/device/drone_controller/tgui_interact(mob/user, datum/tgui/ui)
+  ui = SStgui.try_update_ui(user, src, ui)
+  if(!ui)
+    ui = new(user, src, "DroneController")
+    ui.open()
+
+/obj/item/device/drone_controller/ui_static_data(mob/user)
+	var/list/data = list()
+	data["serial_number"] = serial_number
+	return data
+
+/obj/item/device/drone_controller/ui_data(mob/user)
+	var/list/data = list()
+	data["network"] = network
+	data["activeCamera"] = null
+	// if(current)
+	// 	data["activeCamera"] = list(
+	// 		name = current.c_tag,
+	// 		status = current.status,
+	// 	)
+	if(istype(src.linked_drone, /obj/item/drone))
+		var/obj/item/drone/drone = src.linked_drone
+		data["health"] = drone.health
+		data["maxhealth"] = drone.maxhealth
+		data["serial_number"] = drone.serial_number
+		data["linked_controller"] = drone.linked_controller.serial_number
+		return data
+	if(istype(src.linked_drone, /obj/structure/drone))
+		var/obj/structure/drone/drone = src.linked_drone
+		data["health"] = drone.health
+		data["maxhealth"] = drone.maxhealth
+		data["serial_number"] = drone.serial_number
+		data["linked_controller"] = drone.linked_controller.serial_number
+		return data
+
