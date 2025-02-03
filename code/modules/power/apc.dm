@@ -157,7 +157,7 @@ GLOBAL_LIST_INIT(apc_wire_descriptions, list(
 
 	start_processing()
 
-	if(!start_charge && is_ground_level(z) && prob(10))
+	if(!start_charge && is_ground_level(z) && prob(10) && SSticker.mode != GAMEMODE_COLONY_HOLD )
 		set_broken()
 
 /obj/structure/machinery/power/apc/Destroy()

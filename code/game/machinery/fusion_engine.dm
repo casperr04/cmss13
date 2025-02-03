@@ -48,13 +48,15 @@
 	var/require_fusion_cell = TRUE
 	///The reactors fuel cell, fail rate increases if empty
 	var/obj/item/fuel_cell/fusion_cell
+	// True if the reactors is damaged on initialization, used for colony generators
+	var/start_damaged = FALSE
 
 /obj/structure/machinery/power/reactor/Initialize(mapload, ...)
 	. = ..()
 	if(is_mainship_level(z)) //Only ship reactors can overload
 		is_ship_reactor = TRUE
 
-	if(!buildstate && is_ground_level(z)) //Colony reactors start damaged
+	if(start_damaged)
 		switch(rand(1, 6))
 			if(1 to 3) //50%
 				buildstate = BUILDSTATE_DAMAGE_WELD
@@ -471,6 +473,12 @@
 	is_on = FALSE
 	power_generation_max = 100000 //100,000W at full capacity
 	original_fail_rate = 10
+	start_damaged = TRUE
+
+/obj/structure/machinery/power/reactor/colony/holdout
+	is_on = TRUE
+	original_fail_rate = 0
+	start_damaged = FALSE
 
 #undef BUILDSTATE_FUNCTIONAL
 #undef BUILDSTATE_DAMAGE_WELD

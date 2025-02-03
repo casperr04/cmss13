@@ -286,6 +286,17 @@ GLOBAL_LIST_INIT(job_command_roles, JOB_COMMAND_ROLES_LIST)
 #define JOB_FORECON_RIFLEMAN "Reconnaissance Rifleman"
 #define JOB_FORECON_SMARTGUNNER "Reconnaissance Smartgunner"
 
+//-------- IASF --------//
+
+#define JOB_IASF_RIFLEMAN "IASF Rifleman"
+#define JOB_IASF_ENGI "IASF Sapper"
+#define JOB_IASF_MEDIC "IASF Combat Medic"
+#define JOB_IASF_SPECIALIST "IASF Specialist"
+#define JOB_IASF_LEADER "IASF Squad Leader"
+#define JOB_IASF_JUNIOR_LT "IASF Junior Lieutenant"
+#define JOB_IASF_LT "IASF Lieutenant"
+#define JOB_IASF_LT_COMMANDER "IASF Lieutenant Commander"
+
 //-------- UPP --------//
 #define JOB_UPP	"UPP Ryadovoy"
 #define JOB_UPP_CONSCRIPT "UPP Conscript"
@@ -416,6 +427,17 @@ GLOBAL_LIST_INIT(job_command_roles, JOB_COMMAND_ROLES_LIST)
 
 #define FAX_RESPONDER_JOB_LIST list(JOB_FAX_RESPONDER_USCM_HC, JOB_FAX_RESPONDER_USCM_PVST, JOB_FAX_RESPONDER_WY, JOB_FAX_RESPONDER_UPP, JOB_FAX_RESPONDER_TWE, JOB_FAX_RESPONDER_CLF, JOB_FAX_RESPONDER_CMB, JOB_FAX_RESPONDER_PRESS)
 
+
+//-------------Colony Holdout Roles---------------
+
+//---------- HYBRISA ----------//
+
+#define JOB_HOLDOUT_HYBRISA_CHIEF_ENGINEER "DynaGrid Chief Engineer"
+#define JOB_HOLDOUT_HYBRISA_ENGINEER "DynaGrid Electric Engineer"
+#define JOB_HOLDOUT_HYBRISA_REQUISITION "KMCC Cargo Technician"
+#define JOB_HOLDOUT_HYBRISA_CHIEF_REQUISITION "KMCC Regional Director"
+#define JOB_HOLDOUT_HYBRISA_CMO "Nova Medica Chief Medical Officer"
+#define JOB_HOLDOUT_HYBRISA_DOCTOR "Nova Medica Doctor"
 
 //---------- ANTAG ----------//
 #define JOB_PREDATOR "Predator"
